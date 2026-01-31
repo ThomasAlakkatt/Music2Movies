@@ -5,6 +5,7 @@ import re
 # just load_dotenv() as opposed to dotenv.load_dotenv(). Just makes the code cleaner!
 from dotenv import load_dotenv
 import discogs_client
+from discogs_client.exceptions import DiscogsAPIError, AuthorizationError
 
 # Because of how Discogs API is set-up, I don't need to use the 'requests' library/package here
 
@@ -21,23 +22,34 @@ my_user_agent = os.getenv('DISCOGS_USER_AGENT')
 # This is an object authenticated with my user agent and token that allows me to make calls to the Discogs API!
 client = discogs_client.Client(user_agent=my_user_agent, user_token=my_user_token)
 
+# All functions that make a call using client.ACTION, we will need to wrap it in a try except block for an exception handling catch all
+
 # year is an int, styles is a list, artists is a list, country is a string (Can be None, Worldwide, or specific), genres is a list.
 
 # Adding a seperate function to parse out the 'artists' part of the response
 # The only HTTP response I want from this is a 200 OK, the rest of them (there are 8 others) are different use cases that I should
 # address 
+
+
 def release_details(release_id_number):
-    response = client.release(release_id_number)
-    # Call another function that can parse out the artists portion
-    release_details_dict = {
-        "year": response.year,
-        "styles": response.styles,
-        # Figure out a way to scrape the artist ID, and then the name from the response artists. 
-        "artists": parse_artists(response.artists),
-        "country": response.country,
-        "genres": response.genres,
-    }
-    return release_details_dict
+    try:
+        response = client.release(release_id_number)
+        release_details_dict = {
+            "year": response.year,
+            "styles": response.styles,
+            "artists": parse_artists(response.artists),
+            "country": response.country,
+            "genres": response.genres
+        }
+        return release_details_dict
+    except DiscogsAPIError as e:
+        print(f"Discogs API Error {e}")
+        return None
+    except AuthorizationError as e:
+        print(f"Authorization Error {e}")
+    except Exception as e:
+        print(f"Internal Error {e}")
+        return None
 
 # This function parses the artists list that is returned from the client, then returns the parsed list of one or more strings,
 # I dont think I need artist ID at this point, maybe down the line for reference info, and pictures of the artist which would be cool
@@ -63,6 +75,9 @@ def parse_artists(artists):
             "name": clean_name
         }
     return artist_dict
+
+
+
 
 
 
