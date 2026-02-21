@@ -1,5 +1,6 @@
 # OS allows access to my environmental variables
 import os
+# re is the RegEx library for RegEx operations
 import re
 # dotenv loads the .env file, i do import load_dotenv from here because it makes it easier to do something like
 # just load_dotenv() as opposed to dotenv.load_dotenv(). Just makes the code cleaner!
@@ -47,43 +48,110 @@ def release_details(release_id_number):
         return None
     except AuthorizationError as e:
         print(f"Authorization Error {e}")
+        return None
     except Exception as e:
         print(f"Internal Error {e}")
         return None
 
 # This function parses the artists list that is returned from the client, then returns the parsed list of one or more strings,
 # I dont think I need artist ID at this point, maybe down the line for reference info, and pictures of the artist which would be cool
-
-# Artists is a list, the format is roughly the same for each entry with some exceptions (Future shows up as Future (4)??)
-# Another thing to consider when parsing is how ' may be apart of an artist's name, so it may not be reliable to parse looking at just
-# what is contained in the ''s
-
-# another alternative is to get just the artist ID, then make a separate API call to artists API to get a better format for artist names
-# provided by Discogs itself (this comes in the form of another list of string titled "variations", albeit we can use the first 1 or 2)
-
 def parse_artists(artists):
     # iterate over the list, this goes through each artist
     # make a dict with artist id as a key and name as value, we can add the pictures in 
     # later when we wanna display, when we do this we can change format
     artist_dict = {}
     for artist_entry in artists:
-        # \s* = optional whitespace
-        # \(\d+\) = parentheses with digits
-        # $ = at end of string
-        clean_name = re.sub(r'\s*\(\d+\)$', '', artist_entry.name)
+        clean_name = clean_artist_name(artist_entry.name)
         artist_dict[artist_entry.id] = {
             "name": clean_name
         }
     return artist_dict
 
 
+# need to set-up search here, limit it to the first 15 results for the time being, we can expand if needed
+# dont hard code a number, leave it as a variable so that we can adjust it if needed
+
+# This search function (as it is now) behaves like the "Advanced Search" feature in Discogs
+def search_releases(artist_name, releaseTitle, number_of_results=10, page_number=1, music_type="master"):
+
+    # The type here is set to "Master". This is useful because it combines all the different releases of a song or an album into one,
+    # consolidated item. This way, we won't be displaying duplicate items fto the user. 
+
+    # this will be user input, so make sure to consider empty name and title variables, and to cut out any whitespaces from them too
+    # if artist name OR release title is empty:
+
+    # strips both strings of leading and trailing white spaces
+    # remember that python strings are immutable, hence why we need to reassign instead of simply having artist_name.strip() for example
+    artist_name = artist_name.strip()
+    releaseTitle = releaseTitle.strip()
+
+    # This checks for empty strings, None values, and White-space only values (after strip)
+    if not artist_name or not releaseTitle:
+        return "One or more fields are blank"
+
+    search_results = client.search(
+        artist=artist_name,
+        release_title=releaseTitle,
+        per_page=number_of_results,
+        page=page_number,
+        type=music_type
+        )
+    
+    if not search_results:
+        print("No results, strange...")
+        return None
+
+
+    # We will be returning the output from the search API as a list of dictionaries, with the entries containing the information
+    # for each search result
+
+    # This is the list that will store the dictionaries
+    search_list = []
+
+
+    for release in search_results:
+        search_dict = {}
+        search_dict["id"] = release.id
+        search_dict["title"] = release.title
+        search_dict["year"] = release.year
+        search_dict["artists"] = [clean_name(artist.name) for artist in release.main_release.artists]
+        search_dict["labels"] = [clean_name(label.name) for label in release.main_release.labels]
+        search_list.append(search_dict)
 
 
 
+
+    
+
+
+
+
+
+# check default number of returns without specifying
+# check if we need to go page 0 (0 index or if one is correct)
+# check if we even need to specify the page number (albeit it wouldnt hurt just to leave it)
+
+
+
+
+# The regex function is used to clean up the artist and label name(s). This is because of how Discogs displays these
+def clean_name(media_name):
+    # \s* = optional whitespace
+    # \(\d+\) = parentheses with digits
+    # $ = at end of string
+    media_name = re.sub(r'\s*\(\d+\)$', '', media_name)
+    return media_name
 
 
                 
         
+
+
+search_artist = input("First, enter the name of an artist: ")
+search_music = input("Now, enter the name of a song or album: ")
+
+search_releases(search_artist, search_music)
+
 
 
 
